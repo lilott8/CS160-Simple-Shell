@@ -167,21 +167,20 @@ int main(int argc, char **argv)
  */
 void eval(char *cmdline) 
 {
-  cmdsTable *pCmd = cmdsTable[0];
   char *args;   // rest of string after token
   char *token;  // current token
   char *ptr = cmdline; // dont change the original variable
-  //int i;
+  int i;
   
   token = strtok_r(ptr, " ", &args);
   //while((token = strtok_r(ptr, " ", &args))) {
-    while(pCmd->cmd) {
-      printf("While cmd: %s, arg: %s\n", pCmd->cmd, token);
-      if(strcmp(pCmd->cmd, token)) {
+    for(i=0;i<sizeof(cmdsTable)-1;i++){
+    //while(pCmd->cmd) {
+      printf("While cmd: %s, arg: %s\n", cmdsTable[i].cmd, token);
+      if(strcmp(cmdsTable[i].cmd, token)) {
         
       // this produces a segmentation fault!?
       }
-      pCmd++;
     }
     printf("%s", token);
     ptr = args; // point to the rest of the command
