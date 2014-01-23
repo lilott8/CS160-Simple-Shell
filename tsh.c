@@ -52,26 +52,6 @@ struct job_t {              /* The job struct */
 };
 struct job_t jobs[MAXJOBS]; /* The job list */
 
-/* Jason's Variables */
-typedef int(*cmdFnProcessor)(int argc, char *argv[]);
-typedef struct cmd_t {
-  const char *cmd;
-  cmdFnProcessor cmdFn;
-  const char *help;
-}cmd_t;
-
-struct cmd_t cmdsTable[] = 
-{
-  { "quit", cmd_quit, " : Quit TinyShell" },
-  { "q",    cmd_quit, " : Alias for quit" },
-  { "help", cmd_help, " : Display list of commands" },
-  { "?",    cmd_help, " : Alias for help"},
-  { "jobs", cmd_jobs, " : List running jobs" },
-  { "bg",   cmd_bg,   " : Move program <pid> to the background" },
-  { "fg",   cmd_fg,   " : Move program <pid> to the forground" },
-  { 0, 0, 0},
-  { 0, 0, 0}
-};
 /* End global variables */
 
 
@@ -187,21 +167,27 @@ int main(int argc, char **argv)
  */
 void eval(char *cmdline) 
 {
+  cmdsTable *pCmd = cmdsTable[0];
   char *args;   // rest of string after token
   char *token;  // current token
   char *ptr = cmdline; // dont change the original variable
-  int i;
-  char *temp;
-
-  while((token = strtok_r(ptr, " ", &args))) {
-    for(i=0;i<sizeof(cmdsTable)-1;i++) {
-      if(strcmp(cmdsTable[i].cmd, token)== 0) {
+  //int i;
+  
+  token = strtok_r(ptr, " ", &args);
+  //while((token = strtok_r(ptr, " ", &args))) {
+    while(pCmd->cmd) {
+      printf("While cmd: %s, arg: %s\n", pCmd->cmd, token);
+      if(strcmp(pCmd->cmd, token)) {
+        
       // this produces a segmentation fault!?
       }
+      pCmd++;
     }
     printf("%s", token);
     ptr = args; // point to the rest of the command
-  }
+    // exit because we only need the first arg!
+    //break;
+  //}
   
   
   return;
