@@ -315,6 +315,12 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
+  int pid = fgpid(jobs);
+  if(pid !=0) {
+    if(kill(-pid, SIGINT) < 0) {
+      printf("Error killing: %d\n", pid);
+    }
+  }
   return;
 }
 
