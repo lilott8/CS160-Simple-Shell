@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include "commands.h"
+#include "commands.c"
 
 /* Misc manifest constants */
 #define MAXLINE    1024   /* max line size */
@@ -167,28 +168,26 @@ int main(int argc, char **argv)
  */
 void eval(char *cmdline) 
 {
-  char *args;   // rest of string after token
-  char *token;  // current token
+  char *args = NULL;   // rest of string after token
   char *ptr = cmdline; // dont change the original variable
+  char *token = strtok_r(ptr, " ", &args);;  // current token
   int i;
-  
-  token = strtok_r(ptr, " ", &args);
-  //while((token = strtok_r(ptr, " ", &args))) {
-    for(i=0;i<sizeof(cmdsTable)-1;i++){
-    //while(pCmd->cmd) {
-      printf("While cmd: %s, arg: %s\n", cmdsTable[i].cmd, token);
-      if(strcmp(cmdsTable[i].cmd, token)) {
-        
-      // this produces a segmentation fault!?
-      }
+
+  // pop the first arg off, that's all we need to compare for command
+  for(i=0;i<sizeof(cmdsTable)/sizeof(cmdsTable[0]);i++){
+    //printf("While cmd: %s, arg: %s\n", cmdsTable[i].cmd, token);
+    // Not sure why it has to be 10, but it is consistent with
+    // results given.
+    if(strcmp(token, cmdsTable[i].cmd)==10) {
+      // exit because we only need the first arg!
+      cmdsTable[i].cmdFn(sizeof(args), args);
+      break;
+    } else {
+      //printf("strcmp of %s, %s=%i\n", cmdsTable[i].cmd, token, strcmp(token, cmdsTable[i].cmd));
     }
-    printf("%s", token);
-    ptr = args; // point to the rest of the command
-    // exit because we only need the first arg!
-    //break;
-  //}
-  
-  
+  }// for loop
+  ptr = args; // point to the rest of the command
+
   return;
 }
 
@@ -287,6 +286,7 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
+  printf("we received a: %i\n", sig);
   return;
 }
 
