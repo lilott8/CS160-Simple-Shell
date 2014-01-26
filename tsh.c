@@ -46,10 +46,10 @@ int nextjid = 1;            /* next job ID to allocate */
 char sbuf[MAXLINE];         /* for composing sprintf messages */
 
 struct job_t {              /* The job struct */
-    pid_t pid;              /* job PID */
-    int jid;                /* job ID [1, 2, ...] */
-    int state;              /* UNDEF, BG, FG, or ST */
-    char cmdline[MAXLINE];  /* command line */
+  pid_t pid;              /* job PID */
+  int jid;                /* job ID [1, 2, ...] */
+  int state;              /* UNDEF, BG, FG, or ST */
+  char cmdline[MAXLINE];  /* command line */
 };
 struct job_t jobs[MAXJOBS]; /* The job list */
 
@@ -168,28 +168,36 @@ int main(int argc, char **argv)
  */
 void eval(char *cmdline) 
 {
-  char *args = NULL;   // rest of string after token
-  char *ptr = cmdline; // dont change the original variable
-  char *token = strtok_r(ptr, " ", &args);  // current token
-  int i;
-  bool builtIn = false;
+  char *argv[MAXARGS];
+  int status = parseline(cmdline, argv) ? BG : FG;
 
-  // pop the first arg off, that's all we need to compare for command
-  for(i=0;i<sizeof(cmdsTable)/sizeof(cmdsTable[0]);i++){
-    // Not sure why it has to be 10, but it is consistent with
-    // results given.
-    if(strcmp(token, cmdsTable[i].cmd)==10) {
-      // exit because we only need the first arg!
-      cmdsTable[i].cmdFn(sizeof(args), &args);
-      builtIn = true;
-      break;
-    }
-  }// for loop
-  ptr = args; // point to the rest of the command
-  if(!builtIn) {
-   eval_external(token, &ptr);
-   printf("we have a custom command\n");
+  // arbitrarily hitting enter on cmdline
+  if (argv[0] == NULL) {
+    return;
   }
+
+  pid_t pid;
+  sigset_t mask;
+
+  if(!builtin_cmd(argv)) {
+
+    if((pid = Fork()) == 0) {
+      /**
+       * TODO: allow this to handle an incomplete command
+       * gracefully
+       */
+      execve(argv[0], argv, environ);
+    }
+
+    addjob(jobs, pid, status, cmdline);
+
+    if(status == BG) {
+      printf("Process: %d, has been pushed to bg\n", (int)pid);
+    } else {
+      waitfg(pid);
+    }
+
+  }//if builtin
   return;
 }
 
@@ -256,7 +264,20 @@ int parseline(const char *cmdline, char **argv)
  */
 int builtin_cmd(char **argv) 
 {
-  return 0;     /* not a builtin command */
+  int i;
+  // pop the first arg off, that's all we need to compare for command
+  for(i=0;i<sizeof(cmdsTable)/sizeof(cmdsTable[0]);i++){
+    // Not sure why it has to be 10, but it is consistent with
+    // results given.
+    if(strcmp(token, cmdsTable[i].cmd)==10) {
+      // exit because we only need the first arg!
+      cmdsTable[i].cmdFn(argv);
+      return true;
+      break;
+    }
+  }// for loop
+
+  return false;     /* not a builtin command */
 }
 
 /* 
@@ -272,6 +293,15 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 {
+  pid_t f_pid;
+  while(1) {
+    f_pid = fgpid(jobs);
+    if(pid != f_pid) {
+      printf("process %d is no longer in the fg\n", (int)pid);
+    } else {
+      sleep(2);
+    }
+  }
   return;
 }
 
@@ -467,14 +497,14 @@ void listjobs(struct job_t *jobs)
           printf("Running ");
           break;
         case FG:printf("Attempting to list jobs."); 
-          printf("Foreground ");
-          break;
+                printf("Foreground ");
+                break;
         case ST: 
-          printf("Stopped ");
-          break;
+                printf("Stopped ");
+                break;
         default:
-          printf("listjobs: Internal error: job[%d].state=%d ", 
-              i, jobs[i].state);
+                printf("listjobs: Internal error: job[%d].state=%d ", 
+                    i, jobs[i].state);
       }
       printf("%s", jobs[i].cmdline);
     }
@@ -504,7 +534,7 @@ int eval_external(char *command[], char *argv[]) {
   int status;
   bool is_bg = parseline(*command, argv);
   pid = fork();
-  
+
   j.pid = pid;
   j.jid = nextjid;
   j.state = ST;

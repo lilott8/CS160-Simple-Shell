@@ -19,12 +19,12 @@ char *path[] =
   "/usr/local/sbin",
 };
 /* Implementation of the functions */
-int cmd_quit(int argc, char *argv[]){
+int cmd_quit(char *argv){
   printf("We are quitting!\n");
   exit(0);
 }
 
-int cmd_help(int argc, char *argv[]){
+int cmd_help(char *argv){
   int i;
 
   printf("TinyShell provides these limited commands: \n");

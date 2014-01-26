@@ -1,10 +1,8 @@
 /* Declaration of the functions */
-int cmd_quit(int argc, char *argv[]);
-int cmd_help(int argc, char *argv[]);
-int cmd_jobs(int argc, char *argv[]);
-int cmd_bg(int argc, char *argv[]);
-int cmd_fg(int argc, char *argv[]);
-int eval_external(char *argc, char *argv[]);
+int cmd_quit(char *argv);
+int cmd_help(char *argv);
+int cmd_jobs(char *argv);
+int cmd_bgfg(char *argv);
 
 typedef int(*cmdFnProcessor)(int argc, char *argv[]);
 typedef struct {
