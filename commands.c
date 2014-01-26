@@ -1,4 +1,3 @@
-//#include "commands.h"
 cmdEntry_t cmdsTable[] =
 {
   { "quit", cmd_quit, " : Quit TinyShell" },
@@ -10,6 +9,15 @@ cmdEntry_t cmdsTable[] =
   { "fg",   cmd_fg,   " : Move program <pid> to the forground" }
 };
 
+char *path[] =
+{
+  "/bin",
+  "/sbin"
+  "/usr/bin",
+  "/usr/sbin",
+  "/usr/local/bin",
+  "/usr/local/sbin",
+};
 /* Implementation of the functions */
 int cmd_quit(int argc, char *argv[]){
   printf("We are quitting!\n");
@@ -27,14 +35,6 @@ int cmd_help(int argc, char *argv[]){
   return 1;
 }
 
-int cmd_jobs(int argc, char *argv[]){
-  return 1;
-}
-
-int cmd_bg(int argc, char *argv[]){
-  return 1;
-}
-
-int cmd_fg(int argc, char *argv[]){
-  return 1;
-}
+// because of the variable scope problem
+// cmd_jobs, cmd_bg and cmd_fg are 
+// defined in tsh.c

@@ -1,5 +1,6 @@
 #!/bin/bash
-
+CLEAR="clear"
+$CLEAR
 RUN="make"
 $RUN
 if [ "$1" = 1 ]; then

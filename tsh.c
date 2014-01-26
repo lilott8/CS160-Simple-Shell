@@ -170,24 +170,26 @@ void eval(char *cmdline)
 {
   char *args = NULL;   // rest of string after token
   char *ptr = cmdline; // dont change the original variable
-  char *token = strtok_r(ptr, " ", &args);;  // current token
+  char *token = strtok_r(ptr, " ", &args);  // current token
   int i;
+  bool builtIn = false;
 
   // pop the first arg off, that's all we need to compare for command
   for(i=0;i<sizeof(cmdsTable)/sizeof(cmdsTable[0]);i++){
-    //printf("While cmd: %s, arg: %s\n", cmdsTable[i].cmd, token);
     // Not sure why it has to be 10, but it is consistent with
     // results given.
     if(strcmp(token, cmdsTable[i].cmd)==10) {
       // exit because we only need the first arg!
-      cmdsTable[i].cmdFn(sizeof(args), args);
+      cmdsTable[i].cmdFn(sizeof(args), &args);
+      builtIn = true;
       break;
-    } else {
-      //printf("strcmp of %s, %s=%i\n", cmdsTable[i].cmd, token, strcmp(token, cmdsTable[i].cmd));
     }
   }// for loop
   ptr = args; // point to the rest of the command
-
+  if(!builtIn) {
+   eval_external(token, &ptr);
+   printf("we have a custom command\n");
+  }
   return;
 }
 
@@ -286,7 +288,7 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
-  printf("we received a: %i\n", sig);
+  printf("Sigchld_handler: we received a: %i\n", sig);
   return;
 }
 
@@ -464,7 +466,7 @@ void listjobs(struct job_t *jobs)
         case BG: 
           printf("Running ");
           break;
-        case FG: 
+        case FG:printf("Attempting to list jobs."); 
           printf("Foreground ");
           break;
         case ST: 
@@ -481,10 +483,48 @@ void listjobs(struct job_t *jobs)
 /******************************
  * end job list helper routines
  ******************************/
-bool isCommand(char *cmd) {
-  return false;
+int cmd_jobs(int argc, char *argv[]){
+  printf("Attempting to list jobs.\n");
+  listjobs(jobs);
+  return 1;
 }
 
+int cmd_bg(int argc, char *argv[]){
+  return 1;
+}
+
+int cmd_fg(int argc, char *argv[]){
+  return 1;
+}
+
+int eval_external(char *command[], char *argv[]) {
+  pid_t pid;
+  pid_t tpid;
+  job_t j;
+  int status;
+  bool is_bg = parseline(*command, argv);
+  pid = fork();
+  
+  j.pid = pid;
+  j.jid = nextjid;
+  j.state = ST;
+  j.cmdline = command;
+  addjob(j, pid, ST, *command);
+
+  //if true, run in bg
+  if(is_bg) {
+    execvp(command, argv);
+  } else {
+    do {
+      tpid = wait(&status);
+      if(tpid != pid) {
+        //process_terminated(tpid);
+      }
+    } while(tpid != pid);
+  }
+
+  return 1;
+}
 /***********************
  * Other helper routines
  ***********************/
