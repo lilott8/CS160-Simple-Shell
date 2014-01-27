@@ -41,7 +41,7 @@
 /* Global variables */
 extern char **environ;      /* defined in libc */
 char prompt[] = "tsh> ";    /* command line prompt (DO NOT CHANGE) */
-int verbose = 0;            /* if true, print additional output */
+int verbose = 1;            /* if true, print additional output */
 int nextjid = 1;            /* next job ID to allocate */
 char sbuf[MAXLINE];         /* for composing sprintf messages */
 
@@ -175,10 +175,11 @@ void eval(char *cmdline)
   if (argv[0] == NULL) {
     return;
   }
-
+  // Our process structure
   pid_t pid;
+  // Our sigset structure
   sigset_t mask;
-
+  // Check to see if it's built in or not
   if(!builtin_cmd(argv)) {
 
     if((pid = Fork()) == 0) {
@@ -186,13 +187,13 @@ void eval(char *cmdline)
        * TODO: allow this to handle an incomplete command
        * gracefully
        */
-      execve(argv[0], argv, environ);
+      internal_exec(argv[0], argv, environ);
     }
 
     addjob(jobs, pid, status, cmdline);
 
     if(status == BG) {
-      printf("Process: %d, has been pushed to bg\n", (int)pid);
+      printf("Process: %d, has been pushed to bg\n", pid2jid(pid));
     } else {
       waitfg(pid);
     }
@@ -269,9 +270,9 @@ int builtin_cmd(char **argv)
   for(i=0;i<sizeof(cmdsTable)/sizeof(cmdsTable[0]);i++){
     // Not sure why it has to be 10, but it is consistent with
     // results given.
-    if(strcmp(argv[0], cmdsTable[i].cmd)==10) {
+    if(!strcmp(argv[0], cmdsTable[i].cmd)) {
       // exit because we only need the first arg!
-      cmdsTable[i].cmdFn(argv);
+      cmdsTable[i].cmdFn(*argv);
       return true;
       break;
     }
@@ -296,8 +297,9 @@ void waitfg(pid_t pid)
   pid_t f_pid;
   while(1) {
     f_pid = fgpid(jobs);
-    if(pid != f_pid) {
-      printf("process %d is no longer in the fg\n", (int)pid);
+    if(pid != f_pid) { // search linearly until we find the correct pid
+      printf("waitfg: process %d is no longer in the fg\n", (int)pid);
+      break;
     } else {
       sleep(2);
     }
@@ -318,6 +320,38 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
+  pid_t pid;
+  int status, jid;
+  struct job_t *current_job;
+  char *error;
+
+  /**
+  * We want to suspend eecution until our child has changed state
+  * This will wait for any child process whose pgID = |pid|
+  * From there we can just make decisions based on what
+  * our status is, which is changed in the waitpid function call
+  *
+  */
+  while((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0) {
+    jid = pid2jid(pid);
+    if(WIFSTOPPED(status)) {
+      current_job = getjobpid(jobs, pid);
+      current_job->state = ST;
+      printf("sigchld_handler: stopped %d by signal %d\n", jid, WSTOPSIG(status));
+    } else {
+      deletejob(jobs, pid);
+      if(verbose) printf("sigchld_hanlder: deleted %d\n", jid);
+
+      if (WIFEXITED(status)) { // normal termination
+        printf("sigchld_handler: job %d exited cleanly with status %d\n", jid, WEXITSTATUS(status));
+     } else if(WIFSIGNALED(status)) { // ctrl+c, SIGINT
+        printf("sigchld_handler: job %d received signal %d\n", jid, WTERMSIG(status));
+      } else { // Don't know what happened
+        sprintf(error, "sigchld_handler: Job %d exploded\n", jid);
+        unix_error(error);
+      }
+    }//else
+  }// end while
   printf("Sigchld_handler: we received a: %i\n", sig);
   return;
 }
@@ -330,12 +364,11 @@ void sigchld_handler(int sig)
 void sigint_handler(int sig) 
 {
   //signal(SIGINT, SIG_DLF);
-  int pid = fgpid(jobs);
+  pid_t pid = fgpid(jobs);
 
   if(pid != 0) {
-    if(kill(-pid, SIGINT) < 0) {
-      printf("Error killing: %d\n", pid);
-    }
+    kill(-pid, SIGINT);
+    if (verbose) printf("sigint_handler kiled job: %d\n", pid);
   }
   return;
 }
@@ -347,11 +380,10 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
-  int pid = fgpid(jobs);
+  pid_t pid = fgpid(jobs);
   if(pid !=0) {
-    if(kill(-pid, SIGINT) < 0) {
-      printf("Error killing: %d\n", pid);
-    }
+    kill(-pid, SIGINT);
+    if(verbose) printf("sigtstp_handler killed job: %d\n",pid2jid(pid));
   }
   return;
 }
@@ -593,4 +625,11 @@ pid_t Fork(void) {
     printf("We could not fork our process");
   }
   return pid;
+}
+
+void internal_exec(const char *filename, char *const argv[], char *const envp[]) {
+  if(execvp(filename, argv) < 0) {
+    sprintf(sbuf, "%s: %s", argv[0], "Command not found");
+    app_error(sbuf);
+  }
 }

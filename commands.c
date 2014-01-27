@@ -1,12 +1,12 @@
 cmdEntry_t cmdsTable[] =
 {
-  { "quit", cmd_quit, " : Quit TinyShell" },
-  { "q",    cmd_quit, " : Alias for quit" },
-  { "help", cmd_help, " : Display list of commands" },
-  { "?",    cmd_help, " : Alias for help"},
-  { "jobs", cmd_jobs, " : List running jobs" },
-  { "bg",   cmd_bgfg,   " : Move program <pid> to the background" },
-  { "fg",   cmd_bgfg,   " : Move program <pid> to the forground" }
+  { "quit", cmd_quit, "\t : Quit TinyShell" },
+  { "q",    cmd_quit, "\t : Alias for quit" },
+  { "help", cmd_help, "\t : Display list of commands" },
+  { "?",    cmd_help, "\t : Alias for help"},
+  { "jobs", cmd_jobs, "\t : List running jobs" },
+  { "bg",   cmd_bgfg, "\t : Move program <pid> to the background" },
+  { "fg",   cmd_bgfg, "\t : Move program <pid> to the forground" }
 };
 
 char *path[] =
