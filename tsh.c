@@ -269,7 +269,7 @@ int builtin_cmd(char **argv)
   for(i=0;i<sizeof(cmdsTable)/sizeof(cmdsTable[0]);i++){
     // Not sure why it has to be 10, but it is consistent with
     // results given.
-    if(strcmp(token, cmdsTable[i].cmd)==10) {
+    if(strcmp(argv[0], cmdsTable[i].cmd)==10) {
       // exit because we only need the first arg!
       cmdsTable[i].cmdFn(argv);
       return true;
@@ -513,48 +513,6 @@ void listjobs(struct job_t *jobs)
 /******************************
  * end job list helper routines
  ******************************/
-int cmd_jobs(int argc, char *argv[]){
-  printf("Attempting to list jobs.\n");
-  listjobs(jobs);
-  return 1;
-}
-
-int cmd_bg(int argc, char *argv[]){
-  return 1;
-}
-
-int cmd_fg(int argc, char *argv[]){
-  return 1;
-}
-
-int eval_external(char *command[], char *argv[]) {
-  pid_t pid;
-  pid_t tpid;
-  job_t j;
-  int status;
-  bool is_bg = parseline(*command, argv);
-  pid = fork();
-
-  j.pid = pid;
-  j.jid = nextjid;
-  j.state = ST;
-  j.cmdline = command;
-  addjob(j, pid, ST, *command);
-
-  //if true, run in bg
-  if(is_bg) {
-    execvp(command, argv);
-  } else {
-    do {
-      tpid = wait(&status);
-      if(tpid != pid) {
-        //process_terminated(tpid);
-      }
-    } while(tpid != pid);
-  }
-
-  return 1;
-}
 /***********************
  * Other helper routines
  ***********************/
@@ -615,5 +573,24 @@ void sigquit_handler(int sig)
   exit(1);
 }
 
+/**************************
+ * Jason's Helper Function
+ ***************************/
 
+int cmd_jobs(char *argv){
+  printf("Attempting to list jobs.\n");
+  listjobs(jobs);
+  return 1;
+}
 
+int cmd_bgfg(char *argv){
+  return 1;
+}
+
+pid_t Fork(void) {
+  pid_t pid = fork();
+  if(pid < 0) {
+    printf("We could not fork our process");
+  }
+  return pid;
+}

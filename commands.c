@@ -5,8 +5,8 @@ cmdEntry_t cmdsTable[] =
   { "help", cmd_help, " : Display list of commands" },
   { "?",    cmd_help, " : Alias for help"},
   { "jobs", cmd_jobs, " : List running jobs" },
-  { "bg",   cmd_bg,   " : Move program <pid> to the background" },
-  { "fg",   cmd_fg,   " : Move program <pid> to the forground" }
+  { "bg",   cmd_bgfg,   " : Move program <pid> to the background" },
+  { "fg",   cmd_bgfg,   " : Move program <pid> to the forground" }
 };
 
 char *path[] =
