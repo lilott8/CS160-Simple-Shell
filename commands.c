@@ -36,5 +36,4 @@ int cmd_help(char *argv){
 }
 
 // because of the variable scope problem
-// cmd_jobs, cmd_bg and cmd_fg are 
-// defined in tsh.c
+// cmd_jobs and cmd_bgfg are defined in tsh.c

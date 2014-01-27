@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <string.h>
 #include <ctype.h>
 #include <signal.h>
@@ -13,6 +14,7 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <inttypes.h>
 #include "commands.h"
 #include "commands.c"
 
@@ -171,6 +173,8 @@ void eval(char *cmdline)
   char *argv[MAXARGS];
   int status = parseline(cmdline, argv) ? BG : FG;
 
+  printf("eval: %s\n", cmdline);
+
   // arbitrarily hitting enter on cmdline
   if (argv[0] == NULL) {
     return;
@@ -178,8 +182,8 @@ void eval(char *cmdline)
   // Our process structure
   pid_t pid;
   // Our sigset structure
-  sigset_t mask;
-  // Check to see if it's built in or not
+  // sigset_t mask;
+  /** Check to see if it's built in or not **/
   if(!builtin_cmd(argv)) {
 
     if((pid = Fork()) == 0) {
@@ -189,7 +193,7 @@ void eval(char *cmdline)
        */
       internal_exec(argv[0], argv, environ);
     }
-
+    /** Add our job to the jobs array **/
     addjob(jobs, pid, status, cmdline);
 
     if(status == BG) {
@@ -266,18 +270,17 @@ int parseline(const char *cmdline, char **argv)
 int builtin_cmd(char **argv) 
 {
   int i;
+  printf("builtin argv[1]: %s\n", argv[1]);
   // pop the first arg off, that's all we need to compare for command
   for(i=0;i<sizeof(cmdsTable)/sizeof(cmdsTable[0]);i++){
-    // Not sure why it has to be 10, but it is consistent with
-    // results given.
+    // See if the command is built in
     if(!strcmp(argv[0], cmdsTable[i].cmd)) {
+      // call the necessary function
+      cmdsTable[i].cmdFn(&argv);
       // exit because we only need the first arg!
-      cmdsTable[i].cmdFn(*argv);
       return true;
-      break;
     }
   }// for loop
-
   return false;     /* not a builtin command */
 }
 
@@ -286,6 +289,25 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
+  printf("do_bgfg: attempting to move a job between states\n");
+  //struct job_t *job;
+  /** Make sure we have a jid to manipulate **/
+  int i;
+
+  if(argv[1] == NULL) {
+    printf("You must provide a jid/pid to manipulate a job's state!\n");
+    return;
+  }
+
+
+
+  /*
+     if(!strcmp(argv[0], "bg")){
+     printf("Move to background\n");
+     } else {
+     printf("Move to foreground\n");
+     }
+     */
   return;
 }
 
@@ -323,36 +345,44 @@ void sigchld_handler(int sig)
   pid_t pid;
   int status, jid;
   struct job_t *current_job;
-  char *error;
-
+  char *error = "";
   /**
-  * We want to suspend eecution until our child has changed state
-  * This will wait for any child process whose pgID = |pid|
-  * From there we can just make decisions based on what
-  * our status is, which is changed in the waitpid function call
-  *
-  */
+   * We want to suspend eecution until our child has changed state
+   * This will wait for any child process whose pgID = |pid|
+   * From there we can just make decisions based on what
+   * our status is, which is changed in the waitpid function call
+   *
+   */
   while((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0) {
     jid = pid2jid(pid);
+    /** child process is stopped, but can be restarted **/
     if(WIFSTOPPED(status)) {
       current_job = getjobpid(jobs, pid);
       current_job->state = ST;
       printf("sigchld_handler: stopped %d by signal %d\n", jid, WSTOPSIG(status));
-    } else {
+    }
+    /** Job has been terminated and we can reap it **/
+    else {
       deletejob(jobs, pid);
       if(verbose) printf("sigchld_hanlder: deleted %d\n", jid);
-
-      if (WIFEXITED(status)) { // normal termination
+      /** Normal Termination **/
+      if (WIFEXITED(status)) {
+        /** Terminated because of normal call to exit(), grab the message **/
         printf("sigchld_handler: job %d exited cleanly with status %d\n", jid, WEXITSTATUS(status));
-     } else if(WIFSIGNALED(status)) { // ctrl+c, SIGINT
+      }
+      /** SIGINT: ctrl+c **/
+      else if(WIFSIGNALED(status)) {
+        /** Terminated because of the receipt of a signal, grab the message**/
         printf("sigchld_handler: job %d received signal %d\n", jid, WTERMSIG(status));
-      } else { // Don't know what happened
+      }
+      /** Abnormal termination of process **/
+      else {
         sprintf(error, "sigchld_handler: Job %d exploded\n", jid);
         unix_error(error);
       }
     }//else
   }// end while
-  printf("Sigchld_handler: we received a: %i\n", sig);
+  printf("sigchld_handler: we received a: %i\n", sig);
   return;
 }
 
@@ -368,7 +398,7 @@ void sigint_handler(int sig)
 
   if(pid != 0) {
     kill(-pid, SIGINT);
-    if (verbose) printf("sigint_handler kiled job: %d\n", pid);
+    if (verbose) printf("sigint_handler: kiled job %d\n", pid);
   }
   return;
 }
@@ -383,7 +413,7 @@ void sigtstp_handler(int sig)
   pid_t pid = fgpid(jobs);
   if(pid !=0) {
     kill(-pid, SIGINT);
-    if(verbose) printf("sigtstp_handler killed job: %d\n",pid2jid(pid));
+    if(verbose) printf("sigtstp_handleri: killed job %d\n",pid2jid(pid));
   }
   return;
 }
@@ -610,26 +640,28 @@ void sigquit_handler(int sig)
  ***************************/
 
 int cmd_jobs(char *argv){
-  printf("Attempting to list jobs.\n");
+  printf("cmd_jobs: Listing the current jobs\n");
   listjobs(jobs);
   return 1;
 }
 
 int cmd_bgfg(char *argv){
+  printf("cmd_bgfg argv[1]: %i\n", argv[1]);
+  do_bgfg(&argv);
   return 1;
 }
 
 pid_t Fork(void) {
   pid_t pid = fork();
   if(pid < 0) {
-    printf("We could not fork our process");
+    printf("Fork: We could not fork our process\n");
   }
   return pid;
 }
 
 void internal_exec(const char *filename, char *const argv[], char *const envp[]) {
   if(execvp(filename, argv) < 0) {
-    sprintf(sbuf, "%s: %s", argv[0], "Command not found");
+    sprintf(sbuf, "%s: %s", argv[0], "internal_exec: Command not found\n");
     app_error(sbuf);
   }
 }
