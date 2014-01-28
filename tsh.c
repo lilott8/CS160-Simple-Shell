@@ -276,7 +276,7 @@ int builtin_cmd(char **argv)
     // See if the command is built in
     if(!strcmp(argv[0], cmdsTable[i].cmd)) {
       // call the necessary function
-      cmdsTable[i].cmdFn(&argv);
+      cmdsTable[i].cmdFn(argv);
       // exit because we only need the first arg!
       return true;
     }
@@ -639,15 +639,18 @@ void sigquit_handler(int sig)
  * Jason's Helper Function
  ***************************/
 
-int cmd_jobs(char *argv){
+int cmd_jobs(char **argv){
   printf("cmd_jobs: Listing the current jobs\n");
   listjobs(jobs);
   return 1;
 }
 
-int cmd_bgfg(char *argv){
-  printf("cmd_bgfg argv[1]: %i\n", argv[1]);
-  do_bgfg(&argv);
+int cmd_bgfg(char **argv){
+  // This will output the actual value, but it's not
+  // the correct solution.  The state is still
+  // Comprimised.
+  printf("cmd_bgfg argv[1]: %c\n", (char)*argv[1]);
+  do_bgfg(argv);
   return 1;
 }
 

@@ -1,8 +1,8 @@
 /* Declaration of the functions */
-int cmd_quit(char *argv);
-int cmd_help(char *argv);
-int cmd_jobs(char *argv);
-int cmd_bgfg(char *argv);
+int cmd_quit(char **argv);
+int cmd_help(char **argv);
+int cmd_jobs(char **argv);
+int cmd_bgfg(char **argv);
 pid_t Fork();
 void internal_exec(const char *filename, char *const argv[], char *const envp[]);
 
