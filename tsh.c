@@ -91,7 +91,6 @@ void app_error(char *msg);
 typedef void handler_t(int);
 handler_t *Signal(int signum, handler_t *handler);
 /* My own helper functions */
-bool isCommand(char *cmdline);
 /*
  * main - The shell's main routine 
  */
@@ -172,6 +171,7 @@ void eval(char *cmdline)
 {
   char *argv[MAXARGS];
   int status = parseline(cmdline, argv) ? BG : FG;
+  int i;
 
   printf("eval: %s\n", cmdline);
 
@@ -270,7 +270,7 @@ int parseline(const char *cmdline, char **argv)
 int builtin_cmd(char **argv) 
 {
   int i;
-  printf("builtin argv[1]: %s\n", argv[1]);
+  printf("builtin: argv[1] %s\n", argv[1]);
   // pop the first arg off, that's all we need to compare for command
   for(i=0;i<sizeof(cmdsTable)/sizeof(cmdsTable[0]);i++){
     // See if the command is built in
@@ -289,25 +289,56 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
+  // This will output the actual value, but it's not
+  // the correct solution.  The state is still
+  // Comprimised.
+  struct job_t *job;
+  bool is_job_id;
+
+  printf("cmd_bgfg argv[1]: %c\n", (char)*argv[1]);
   printf("do_bgfg: attempting to move a job between states\n");
   //struct job_t *job;
   /** Make sure we have a jid to manipulate **/
-  int i;
-
   if(argv[1] == NULL) {
     printf("You must provide a jid/pid to manipulate a job's state!\n");
     return;
   }
+  if(!isdigit(argv[1][0]) && argv[1][0] != '%') {
+    printf("%s: the argument must be a PID or %%jobID\n", argv[0]);
+    return;
+  }
 
+  if(argv[1][0] == '%') {
+    is_job_id = 1;
+  } else {
+    is_job_id = 0;
+  }
+  /** Error checking for verifying the jib/pid **/
+  if(is_job_id) {
+    job = getjobjid(jobs, atoi(&argv[1][1]));
+    if(job == NULL) {
+      printf("Job: %d does not exist\n", atoi(argv[1]));
+      return;
+    }
+  } else {
+    job = getjobpid(jobs, (pid_t) atoi(argv[1]));
+    if(job == NULL) {
+      printf("Job: %d does not exist\n", atoi(argv[1]));
+      return;
+    }
+  }
 
+  if(strcmp(argv[0], "fg") == 0) {
+    job->state = FG;
+    printf("Moving job:%d to the foreground\n", job->jid);
+    kill(-job->pid, SIGCONT);
+    waitfg(job->pid);
+  } else {
+    job->state = BG;
+    printf("Moving job:%d to the background\n", job->jid);
+    kill(job->pid, SIGCONT);
+  }
 
-  /*
-     if(!strcmp(argv[0], "bg")){
-     printf("Move to background\n");
-     } else {
-     printf("Move to foreground\n");
-     }
-     */
   return;
 }
 
@@ -646,10 +677,6 @@ int cmd_jobs(char **argv){
 }
 
 int cmd_bgfg(char **argv){
-  // This will output the actual value, but it's not
-  // the correct solution.  The state is still
-  // Comprimised.
-  printf("cmd_bgfg argv[1]: %c\n", (char)*argv[1]);
   do_bgfg(argv);
   return 1;
 }
