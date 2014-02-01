@@ -63,6 +63,7 @@ struct job_t jobs[MAXJOBS]; /* The job list */
 /* Here are the functions that you will implement */
 void eval(char *cmdline);
 int builtin_cmd(char **argv);
+int builtin_cmd2(char **argv);
 void do_bgfg(char **argv);
 void waitfg(pid_t pid);
 
@@ -171,9 +172,6 @@ void eval(char *cmdline)
 {
   char *argv[MAXARGS];
   int status = parseline(cmdline, argv) ? BG : FG;
-  int i;
-
-  printf("eval: %s\n", cmdline);
 
   // arbitrarily hitting enter on cmdline
   if (argv[0] == NULL) {
@@ -182,19 +180,26 @@ void eval(char *cmdline)
   // Our process structure
   pid_t pid;
   // Our sigset structure
-  // sigset_t mask;
+  sigset_t mask;
   /** Check to see if it's built in or not **/
   if(!builtin_cmd(argv)) {
+
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    sigprocmask(SIG_BLOCK, &mask, NULL);
 
     if((pid = Fork()) == 0) {
       /**
        * TODO: allow this to handle an incomplete command
        * gracefully
        */
+      setpgid(0,0);
+      sigprocmask(SIG_UNBLOCK, &mask, NULL);
       internal_exec(argv[0], argv, environ);
     }
     /** Add our job to the jobs array **/
     addjob(jobs, pid, status, cmdline);
+    sigprocmask(SIG_UNBLOCK, &mask, NULL);
 
     if(status == BG) {
       printf("Process: %d, has been pushed to bg\n", pid2jid(pid));
@@ -270,7 +275,6 @@ int parseline(const char *cmdline, char **argv)
 int builtin_cmd(char **argv) 
 {
   int i;
-  printf("builtin: argv[1] %s\n", argv[1]);
   // pop the first arg off, that's all we need to compare for command
   for(i=0;i<sizeof(cmdsTable)/sizeof(cmdsTable[0]);i++){
     // See if the command is built in
@@ -281,7 +285,21 @@ int builtin_cmd(char **argv)
       return true;
     }
   }// for loop
-  return false;     /* not a builtin command */
+  // not builtin
+  return false;
+}
+
+int builtin_cmd2(char **argv) {
+  if (strcmp(argv[0], "quit") == 0) {
+    exit(0);
+  } else if (strcmp(argv[0], "fg") == 0 || strcmp(argv[0], "bg") == 0) {
+    do_bgfg(argv);
+    return 1;
+  } else if (strcmp(argv[0], "jobs") == 0) {
+    listjobs(jobs);
+    return 1;
+  }
+  return 0;
 }
 
 /* 
@@ -295,7 +313,6 @@ void do_bgfg(char **argv)
   struct job_t *job;
   bool is_job_id;
 
-  printf("cmd_bgfg argv[1]: %c\n", (char)*argv[1]);
   printf("do_bgfg: attempting to move a job between states\n");
   //struct job_t *job;
   /** Make sure we have a jid to manipulate **/
@@ -671,13 +688,13 @@ void sigquit_handler(int sig)
  ***************************/
 
 int cmd_jobs(char **argv){
-  printf("cmd_jobs: Listing the current jobs\n");
   listjobs(jobs);
   return 1;
 }
 
 int cmd_bgfg(char **argv){
-  do_bgfg(argv);
+  char** test = argv;
+  do_bgfg(test);
   return 1;
 }
 
