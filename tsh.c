@@ -15,8 +15,8 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <inttypes.h>
-#include "commands.h"
-#include "commands.c"
+//#include "commands.h"
+//#include "commands.c"
 
 /* Misc manifest constants */
 #define MAXLINE    1024   /* max line size */
@@ -57,8 +57,25 @@ struct job_t jobs[MAXJOBS]; /* The job list */
 
 /* End global variables */
 
+/** Jason's variables **/
+typedef int(*cmdFnProcessor)(char **argv);
+typedef struct {
+  const char *cmd;
+  cmdFnProcessor cmdFn;
+  const char *help;
+}cmdEntry_t;
 
+extern cmdEntry_t cmdsTable[];
+extern char *path[];
 /* Function prototypes */
+
+/* My own helper functions */
+void internal_exec(const char *filename, char *const argv[], char *const envp[]);
+int cmd_quit(char **argv);
+int cmd_help(char **argv);
+int cmd_jobs(char **argv);
+int cmd_bgfg(char **argv);
+pid_t Fork();
 
 /* Here are the functions that you will implement */
 void eval(char *cmdline);
@@ -91,7 +108,30 @@ void unix_error(char *msg);
 void app_error(char *msg);
 typedef void handler_t(int);
 handler_t *Signal(int signum, handler_t *handler);
-/* My own helper functions */
+
+/* Initialize my variables */
+cmdEntry_t cmdsTable[] =
+{
+  { "quit", cmd_quit, "\t : Quit TinyShell" },
+  { "q",    cmd_quit, "\t : Alias for quit" },
+  { "help", cmd_help, "\t : Display list of commands" },
+  { "?",    cmd_help, "\t : Alias for help"},
+  { "jobs", cmd_jobs, "\t : List running jobs" },
+  { "bg",   cmd_bgfg, "\t : Move program <pid> to the background" },
+  { "fg",   cmd_bgfg, "\t : Move program <pid> to the forground" }
+};
+
+char *path[] =
+{
+  "/bin",
+  "/sbin"
+    "/usr/bin",
+  "/usr/sbin",
+  "/usr/local/bin",
+  "/usr/local/sbin",
+};
+
+
 /*
  * main - The shell's main routine 
  */
@@ -711,4 +751,20 @@ void internal_exec(const char *filename, char *const argv[], char *const envp[])
     sprintf(sbuf, "%s: %s", argv[0], "internal_exec: Command not found\n");
     app_error(sbuf);
   }
+}
+
+int cmd_quit(char **argv){
+  printf("We are quitting!\n");
+  exit(0);
+}
+
+int cmd_help(char **argv){
+  int i;
+
+  printf("TinyShell provides these limited commands: \n");
+
+  for(i=0;i<sizeof(cmdsTable)/sizeof(cmdsTable[0]);i++) {
+    printf("%s %s\n", cmdsTable[i].cmd, cmdsTable[i].help);
+  }
+  return 1;
 }
