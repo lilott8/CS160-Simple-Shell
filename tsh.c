@@ -43,7 +43,7 @@
 /* Global variables */
 extern char **environ;      /* defined in libc */
 char prompt[] = "tsh> ";    /* command line prompt (DO NOT CHANGE) */
-int verbose = 1;            /* if true, print additional output */
+int verbose = 0;            /* if true, print additional output */
 int nextjid = 1;            /* next job ID to allocate */
 char sbuf[MAXLINE];         /* for composing sprintf messages */
 
@@ -242,7 +242,8 @@ void eval(char *cmdline)
     sigprocmask(SIG_UNBLOCK, &mask, NULL);
 
     if(status == BG) {
-      printf("Process: %d, has been pushed to bg\n", pid2jid(pid));
+      struct job_t *job =getjobpid(jobs, pid);
+      printf("[%d] (%d) %s\n", job->jid, pid, *argv);
     } else {
       waitfg(pid);
     }
@@ -329,19 +330,6 @@ int builtin_cmd(char **argv)
   return false;
 }
 
-int builtin_cmd2(char **argv) {
-  if (strcmp(argv[0], "quit") == 0) {
-    exit(0);
-  } else if (strcmp(argv[0], "fg") == 0 || strcmp(argv[0], "bg") == 0) {
-    do_bgfg(argv);
-    return 1;
-  } else if (strcmp(argv[0], "jobs") == 0) {
-    listjobs(jobs);
-    return 1;
-  }
-  return 0;
-}
-
 /* 
  * do_bgfg - Execute the builtin bg and fg commands
  */
@@ -353,7 +341,7 @@ void do_bgfg(char **argv)
   struct job_t *job;
   bool is_job_id;
 
-  printf("do_bgfg: attempting to move a job between states\n");
+  if(verbose) printf("do_bgfg: attempting to move a job between states\n");
   //struct job_t *job;
   /** Make sure we have a jid to manipulate **/
   if(argv[1] == NULL) {
@@ -374,25 +362,25 @@ void do_bgfg(char **argv)
   if(is_job_id) {
     job = getjobjid(jobs, atoi(&argv[1][1]));
     if(job == NULL) {
-      printf("Job: %d does not exist\n", atoi(argv[1]));
+      printf("Job: %c does not exist$\n", argv[1]);
       return;
     }
   } else {
     job = getjobpid(jobs, (pid_t) atoi(argv[1]));
     if(job == NULL) {
-      printf("Job: %d does not exist\n", atoi(argv[1]));
+      printf("Job: %d does not exist@\n", atoi(argv[1][1]));
       return;
     }
   }
 
   if(strcmp(argv[0], "fg") == 0) {
     job->state = FG;
-    printf("Moving job:%d to the foreground\n", job->jid);
+    if(verbose) printf("Moving job: %d to the foreground\n", job->jid);
     kill(-job->pid, SIGCONT);
     waitfg(job->pid);
   } else {
     job->state = BG;
-    printf("Moving job:%d to the background\n", job->jid);
+    if(verbose) printf("Moving job: %d to the background\n", job->jid);
     kill(job->pid, SIGCONT);
   }
 
@@ -408,7 +396,7 @@ void waitfg(pid_t pid)
   while(1) {
     f_pid = fgpid(jobs);
     if(pid != f_pid) { // search linearly until we find the correct pid
-      printf("waitfg: process %d is no longer in the fg\n", (int)pid);
+      if(verbose) printf("waitfg: process %d is no longer in the fg\n", (int)pid);
       break;
     } else {
       sleep(2);
@@ -435,33 +423,37 @@ void sigchld_handler(int sig)
   struct job_t *current_job;
   char *error = "";
   /**
-   * We want to suspend eecution until our child has changed state
+   * We want to suspend execution until our child has changed state
    * This will wait for any child process whose pgID = |pid|
    * From there we can just make decisions based on what
    * our status is, which is changed in the waitpid function call
    *
    */
   while((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0) {
+    // grab the job_id of our process
     jid = pid2jid(pid);
+
     /** child process is stopped, but can be restarted **/
     if(WIFSTOPPED(status)) {
       current_job = getjobpid(jobs, pid);
       current_job->state = ST;
-      printf("sigchld_handler: stopped %d by signal %d\n", jid, WSTOPSIG(status));
+      if(verbose) printf("sigchld_handler: stopped %d by signal %d\n", jid, WSTOPSIG(status));
     }
     /** Job has been terminated and we can reap it **/
     else {
+      /** Delete the job from the job array **/
       deletejob(jobs, pid);
+      
       if(verbose) printf("sigchld_hanlder: deleted %d\n", jid);
       /** Normal Termination **/
       if (WIFEXITED(status)) {
         /** Terminated because of normal call to exit(), grab the message **/
-        printf("sigchld_handler: job %d exited cleanly with status %d\n", jid, WEXITSTATUS(status));
+        printf("Job [%d] (%d) terminated by signal %d\n",jid, pid, WEXITSTATUS(status));
       }
       /** SIGINT: ctrl+c **/
       else if(WIFSIGNALED(status)) {
         /** Terminated because of the receipt of a signal, grab the message**/
-        printf("sigchld_handler: job %d received signal %d\n", jid, WTERMSIG(status));
+        printf("Job [%d] (%d) terminated by signal %d\n",jid, pid, WTERMSIG(status));
       }
       /** Abnormal termination of process **/
       else {
@@ -470,7 +462,7 @@ void sigchld_handler(int sig)
       }
     }//else
   }// end while
-  printf("sigchld_handler: we received a: %i\n", sig);
+  if(verbose)printf("sigchld_handler: we received a: %i\n", sig);
   return;
 }
 
@@ -747,14 +739,14 @@ pid_t Fork(void) {
 }
 
 void internal_exec(const char *filename, char *const argv[], char *const envp[]) {
-  if(execvp(filename, argv) < 0) {
-    sprintf(sbuf, "%s: %s", argv[0], "internal_exec: Command not found\n");
+  if(execve(filename, argv, envp) < 0) {
+    sprintf(sbuf, "%s: %s", argv[0], "Command not found\n");
     app_error(sbuf);
   }
 }
 
 int cmd_quit(char **argv){
-  printf("We are quitting!\n");
+  if(verbose) printf("We are quitting!\n");
   exit(0);
 }
 
